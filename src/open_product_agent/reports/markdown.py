@@ -88,9 +88,20 @@ def _render_analysis_notes(analysis: dict[str, Any]) -> list[str]:
     if short_explanation:
         lines.extend([str(short_explanation), ""])
 
+    recommendation = analysis.get("recommendation")
+    recommendation_reason = analysis.get("recommendation_reason")
+    if recommendation or recommendation_reason:
+        lines.extend(["#### Recommendation", ""])
+        if recommendation:
+            lines.append(f"- Decision: {recommendation}")
+        if recommendation_reason:
+            lines.append(f"- Reason: {recommendation_reason}")
+        lines.append("")
+
     for title, key in [
         ("Risk Flags", "risk_flags"),
         ("Missing Information", "missing_information"),
+        ("Next Steps", "next_steps"),
         ("Seller Questions", "seller_questions"),
     ]:
         values = analysis.get(key)

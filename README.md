@@ -72,14 +72,22 @@ opa report --profile examples/profiles/family_car.yml --db open_product_agent.sq
 ```
 
 The current CLI supports local CSV/JSON imports, deterministic scoring, and
-Markdown report generation. AI analysis is available through the OpenAI provider
-and stores validated structured output before scoring uses it.
+Markdown report generation. AI analysis is available through OpenAI and Ollama
+providers and stores validated structured output before scoring uses it.
+
+For local Ollama testing:
+
+```bash
+ollama pull llama3.1
+opa analyze --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3 --provider ollama --model llama3.1 --limit 1
+```
 
 Cost estimates are only calculated when explicit token prices are passed:
 
 ```bash
 opa analyze \
   --profile examples/profiles/family_car.yml \
+  --provider openai \
   --input-cost-per-1m 0.00 \
   --output-cost-per-1m 0.00
 ```

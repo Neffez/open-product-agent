@@ -4,6 +4,8 @@ import yaml
 from typer.testing import CliRunner
 
 from open_product_agent import __version__
+from open_product_agent.ai.ollama_provider import OllamaProvider
+from open_product_agent.ai.providers import create_provider
 from open_product_agent.cli import app
 from open_product_agent.domain_packs.loader import load_domain_pack
 from open_product_agent.importers.json_importer import load_json
@@ -181,6 +183,9 @@ def test_analyze_score_and_report_with_ai_output(tmp_path: Path, monkeypatch) ->
                 ],
                 "seller_questions": ["Is the car accident-free?"],
                 "short_explanation": "Good match, but history needs confirmation.",
+                "recommendation": "contact_seller",
+                "recommendation_reason": "The fit is strong if history checks pass.",
+                "next_steps": ["Ask for service records."],
             }
 
     def fake_create_provider(provider, *, model, temperature=0):
@@ -246,4 +251,109 @@ def test_analyze_score_and_report_with_ai_output(tmp_path: Path, monkeypatch) ->
     report = report_path.read_text(encoding="utf-8")
     assert "### AI Analysis" in report
     assert "Good match, but history needs confirmation." in report
+    assert "#### Recommendation" in report
+    assert "The fit is strong if history checks pass." in report
+    assert "Ask for service records." in report
     assert "Is the car accident-free?" in report
+
+
+def test_analyze_stores_provider_failures_without_crashing(tmp_path: Path, monkeypatch) -> None:
+    class FailingProvider:
+        last_token_usage = {}
+
+        def analyze_item(self, profile, item_snapshot, domain_pack):
+            raise RuntimeError("provider unavailable")
+
+    def fake_create_provider(provider, *, model, temperature=0):
+        return FailingProvider()
+
+    monkeypatch.setattr("open_product_agent.cli.create_provider", fake_create_provider)
+
+    db_path = tmp_path / "opa.sqlite3"
+    profile_path = ROOT / "examples/profiles/family_car.yml"
+    import_path = ROOT / "examples/imports/cars.json"
+    runner = CliRunner()
+
+    assert runner.invoke(
+        app,
+        [
+            "import",
+            "json",
+            str(import_path),
+            "--profile",
+            str(profile_path),
+            "--db",
+            str(db_path),
+        ],
+    ).exit_code == 0
+
+    analyze_result = runner.invoke(
+        app,
+        [
+            "analyze",
+            "--profile",
+            str(profile_path),
+            "--db",
+            str(db_path),
+            "--provider",
+            "openai",
+            "--model",
+            "fake-model",
+        ],
+    )
+
+    assert analyze_result.exit_code == 0
+    assert "Analyzed 0 item(s), 1 failed" in analyze_result.stdout
+
+
+def test_provider_factory_creates_ollama_provider() -> None:
+    provider = create_provider("ollama", model="llama3.1")
+
+    assert isinstance(provider, OllamaProvider)
+    assert provider.model == "llama3.1"
+
+
+def test_ollama_provider_validates_json_response(monkeypatch) -> None:
+    provider = OllamaProvider(model="llama3.1")
+
+    def fake_post_json(path, payload):
+        assert path == "/api/chat"
+        assert payload["format"]["type"] == "object"
+        return {
+            "message": {
+                "content": """
+                {
+                  "detected_attributes": {"isofix": true},
+                  "risk_flags": [],
+                  "positive_signals": ["isofix"],
+                  "missing_information": ["service_history"],
+                  "evidence": [
+                    {
+                      "attribute": "isofix",
+                      "value": true,
+                      "source_text": "Isofix listed.",
+                      "confidence": 0.9
+                    }
+                  ],
+                  "seller_questions": ["Is there a complete service history?"],
+                  "short_explanation": "Isofix is mentioned.",
+                  "recommendation": "needs_more_information",
+                  "recommendation_reason": "Service history must be confirmed first.",
+                  "next_steps": ["Ask for service history documents."]
+                }
+                """
+            },
+            "prompt_eval_count": 11,
+            "eval_count": 22,
+        }
+
+    monkeypatch.setattr(provider, "_post_json", fake_post_json)
+
+    result = provider.analyze_item(
+        profile={"name": "Family car"},
+        item_snapshot={"description": "Isofix listed."},
+        domain_pack={"domain": "cars"},
+    )
+
+    assert result["detected_attributes"]["isofix"] is True
+    assert provider.last_token_usage == {"input_tokens": 11, "output_tokens": 22}

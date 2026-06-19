@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -23,6 +23,15 @@ class ItemAnalysis(BaseModel):
     evidence: list[Evidence]
     seller_questions: list[str]
     short_explanation: str
+    recommendation: Literal[
+        "contact_seller",
+        "shortlist",
+        "watch",
+        "skip",
+        "needs_more_information",
+    ]
+    recommendation_reason: str
+    next_steps: list[str]
 
 
 class AIAnalysisRun(BaseModel):

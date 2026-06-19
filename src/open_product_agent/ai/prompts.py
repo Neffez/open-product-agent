@@ -16,7 +16,9 @@ def build_item_analysis_messages(
         "You analyze product listings for a self-hosted personal research tool. "
         "Extract only facts supported by the provided item snapshot. Prefer unknown "
         "or missing_information over guessing. Keep source evidence in the original "
-        "language. Return only structured JSON matching the schema."
+        "language. Return only structured JSON matching the schema. Always include a "
+        "decision-oriented recommendation, a concise recommendation_reason, and "
+        "practical next_steps the user can take before contacting or rejecting the item."
     )
     user_payload = {
         "profile": profile,

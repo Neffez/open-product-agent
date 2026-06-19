@@ -13,7 +13,7 @@ from open_product_agent import __version__
 from open_product_agent.ai.cost_tracker import estimate_cost_usd
 from open_product_agent.ai.prompts import PROMPT_VERSION
 from open_product_agent.ai.providers import create_provider
-from open_product_agent.ai.validator import AnalysisValidationError, parse_and_validate_item_analysis
+from open_product_agent.ai.validator import parse_and_validate_item_analysis
 from open_product_agent.database.store import Store
 from open_product_agent.domain_packs.loader import load_domain_pack
 from open_product_agent.importers.csv_importer import load_csv
@@ -177,7 +177,7 @@ def analyze(
             )
             output = parse_and_validate_item_analysis(raw_output).model_dump(mode="json")
             analyzed += 1
-        except (AnalysisValidationError, RuntimeError, ValueError) as exc:
+        except Exception as exc:
             validation_status = "analysis_failed"
             output = {"error": str(exc)}
             failed += 1
