@@ -14,5 +14,6 @@ build/
 *.db
 *.sqlite
 *.sqlite3
-reports/
+/reports/
+examples/reports/*.md
 plan/

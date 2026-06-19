@@ -13,3 +13,8 @@ The initial score model should stay small:
 - risk flag penalties
 - nice-to-have bonuses
 - capped 0 to 100 overall score
+
+The current MVP scoring implementation is deterministic and intentionally
+conservative. It uses item fields, normalized attributes, source text, and
+Domain Pack synonyms where available. AI-generated evidence will be added later,
+but final score calculation should remain rule-based.

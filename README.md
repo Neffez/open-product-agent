@@ -64,10 +64,14 @@ opa --help
 opa version
 opa profile validate examples/profiles/family_car.yml
 opa domain validate domains/cars/domain.yml
+opa init-db --db open_product_agent.sqlite3
+opa import csv examples/imports/cars.csv --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3
+opa score --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3
+opa report --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3 --output examples/reports/family_car.md
 ```
 
-Most planned commands are intentionally not implemented yet. The foundation
-contains the public shape for the CLI and the initial schemas.
+The current CLI supports local CSV/JSON imports, deterministic scoring, and
+Markdown report generation. AI analysis is planned for a later phase.
 
 ## License
 

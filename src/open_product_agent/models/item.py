@@ -31,3 +31,15 @@ class ItemSnapshot(BaseModel):
     description: str | None = None
     raw_data: dict[str, Any] = Field(default_factory=dict)
     content_hash: str | None = None
+
+
+class ImportRun(BaseModel):
+    id: str
+    source_id: str | None = None
+    started_at: datetime
+    finished_at: datetime | None = None
+    status: str
+    items_seen: int = 0
+    items_created: int = 0
+    items_updated: int = 0
+    errors: list[str] = Field(default_factory=list)
