@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 from open_product_agent.models.item import Item
 from open_product_agent.models.profile import ProductProfile
@@ -12,6 +13,7 @@ def render_report(
     profile: ProductProfile,
     scored_items: list[tuple[Item, ItemScore]],
     top: int,
+    analyses_by_item: dict[str, dict[str, Any]] | None = None,
 ) -> str:
     lines = [
         f"# Product Report: {profile.name}",
@@ -26,6 +28,7 @@ def render_report(
         return "\n".join(lines)
 
     for index, (item, score) in enumerate(scored_items[:top], start=1):
+        analysis = (analyses_by_item or {}).get(item.id)
         lines.extend(
             [
                 f"## {index}. {item.title or item.id}",
@@ -52,6 +55,8 @@ def render_report(
                 "",
             ]
         )
+        if analysis:
+            lines.extend(_render_analysis_notes(analysis))
     return "\n".join(lines)
 
 
@@ -75,3 +80,22 @@ def _format_source(item: Item) -> str:
     if item.source_url:
         return str(item.source_url)
     return item.source_name or "unknown"
+
+
+def _render_analysis_notes(analysis: dict[str, Any]) -> list[str]:
+    lines = ["### AI Analysis", ""]
+    short_explanation = analysis.get("short_explanation")
+    if short_explanation:
+        lines.extend([str(short_explanation), ""])
+
+    for title, key in [
+        ("Risk Flags", "risk_flags"),
+        ("Missing Information", "missing_information"),
+        ("Seller Questions", "seller_questions"),
+    ]:
+        values = analysis.get(key)
+        if isinstance(values, list) and values:
+            lines.extend([f"#### {title}", ""])
+            lines.extend(f"- {value}" for value in values)
+            lines.append("")
+    return lines

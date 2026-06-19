@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 
 from open_product_agent.models.domain_pack import DomainPack
 from open_product_agent.models.item import Item
@@ -14,9 +15,16 @@ def calculate_scores(
     *,
     profile_id: str,
     domain_pack: DomainPack | None = None,
+    analyses_by_item: dict[str, dict[str, Any]] | None = None,
 ) -> list[ItemScore]:
     return [
-        _score_item(profile, item, profile_id=profile_id, domain_pack=domain_pack)
+        _score_item(
+            profile,
+            item,
+            profile_id=profile_id,
+            domain_pack=domain_pack,
+            analysis=(analyses_by_item or {}).get(item.id),
+        )
         for item in items
     ]
 
@@ -27,6 +35,7 @@ def _score_item(
     *,
     profile_id: str,
     domain_pack: DomainPack | None,
+    analysis: dict[str, Any] | None,
 ) -> ItemScore:
     fit_score = 100
     value_score = 100
@@ -55,14 +64,16 @@ def _score_item(
         reasons.append(f"mileage exceeds maximum ({mileage} > {max_mileage})")
 
     missing_must_have = [
-        feature for feature in profile.must_have if not _has_signal(item, feature, domain_pack)
+        feature
+        for feature in profile.must_have
+        if not _has_signal(item, feature, domain_pack, analysis)
     ]
     if missing_must_have:
         fit_score -= 15 * len(missing_must_have)
         reasons.append("missing must-have evidence: " + ", ".join(missing_must_have))
 
     nice_to_have_matches = [
-        feature for feature in profile.nice_to_have if _has_signal(item, feature, domain_pack)
+        feature for feature in profile.nice_to_have if _has_signal(item, feature, domain_pack, analysis)
     ]
     if nice_to_have_matches:
         fit_score += min(10, 3 * len(nice_to_have_matches))
@@ -71,6 +82,20 @@ def _score_item(
     if not item.title:
         risk_score -= 10
         reasons.append("title is missing")
+
+    if analysis:
+        risk_flags = analysis.get("risk_flags") or []
+        if risk_flags:
+            risk_score -= min(30, 5 * len(risk_flags))
+            reasons.append("AI risk flags: " + ", ".join(str(flag) for flag in risk_flags))
+
+        missing_information = analysis.get("missing_information") or []
+        if missing_information:
+            risk_score -= min(15, 3 * len(missing_information))
+            reasons.append(
+                "AI missing information: "
+                + ", ".join(str(field) for field in missing_information[:5])
+            )
 
     overall_score = round(
         (_clamp(fit_score) * 0.40)
@@ -117,8 +142,18 @@ def _attribute_int(item: Item, key: str) -> int | None:
         return None
 
 
-def _has_signal(item: Item, feature: str, domain_pack: DomainPack | None) -> bool:
+def _has_signal(
+    item: Item,
+    feature: str,
+    domain_pack: DomainPack | None,
+    analysis: dict[str, Any] | None,
+) -> bool:
     signals = [feature, *_synonyms_for(feature, domain_pack)]
+    detected_attributes = analysis.get("detected_attributes") if analysis else None
+    if isinstance(detected_attributes, dict):
+        value = detected_attributes.get(feature)
+        if value is True or str(value).lower() in {"true", "yes", "ja", "included"}:
+            return True
     if item.attributes.get(feature) is True:
         return True
     if str(item.attributes.get(feature)).lower() in {"true", "yes", "ja", "included"}:

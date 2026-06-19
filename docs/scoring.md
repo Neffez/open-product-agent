@@ -16,5 +16,14 @@ The initial score model should stay small:
 
 The current MVP scoring implementation is deterministic and intentionally
 conservative. It uses item fields, normalized attributes, source text, and
-Domain Pack synonyms where available. AI-generated evidence will be added later,
-but final score calculation should remain rule-based.
+Domain Pack synonyms where available. Valid AI-generated evidence can enrich the
+input data, but final score calculation remains rule-based.
+
+When valid AI analysis output exists, scoring may use:
+
+- `detected_attributes` as additional evidence for profile features
+- `risk_flags` as deterministic risk penalties
+- `missing_information` as deterministic uncertainty penalties
+
+Invalid or failed AI analysis runs are stored for auditability but ignored by
+scoring.

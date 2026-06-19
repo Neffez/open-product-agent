@@ -1,3 +1,5 @@
+import hashlib
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated
@@ -8,10 +10,15 @@ import yaml
 from pydantic import ValidationError
 
 from open_product_agent import __version__
+from open_product_agent.ai.cost_tracker import estimate_cost_usd
+from open_product_agent.ai.prompts import PROMPT_VERSION
+from open_product_agent.ai.providers import create_provider
+from open_product_agent.ai.validator import AnalysisValidationError, parse_and_validate_item_analysis
 from open_product_agent.database.store import Store
 from open_product_agent.domain_packs.loader import load_domain_pack
 from open_product_agent.importers.csv_importer import load_csv
 from open_product_agent.importers.json_importer import load_json
+from open_product_agent.models.analysis import AIAnalysisRun
 from open_product_agent.models.domain_pack import DomainPack
 from open_product_agent.models.item import ImportRun
 from open_product_agent.models.profile import ProductProfile, ProductProfileEnvelope
@@ -100,14 +107,105 @@ def score(
     store.init()
     store.save_profile(profile_id, profile)
     items = store.list_items(domain=profile.domain)
+    analyses_by_item = {
+        item_id: analysis.output or {}
+        for item_id, analysis in store.list_latest_valid_analyses(profile_id).items()
+    }
     scores = calculate_scores(
         profile,
         items,
         profile_id=profile_id,
         domain_pack=domain_pack,
+        analyses_by_item=analyses_by_item,
     )
     store.save_scores(scores)
     typer.echo(f"Scored {len(scores)} item(s) for profile: {profile.name}")
+
+
+@app.command()
+def analyze(
+    profile_path: Annotated[Path, typer.Option("--profile", help="YAML profile path.")],
+    provider_name: Annotated[str, typer.Option("--provider", help="AI provider name.")] = "openai",
+    model: Annotated[str, typer.Option("--model", help="Provider model name.")] = "gpt-4.1-mini",
+    input_cost_per_1m: Annotated[
+        float | None,
+        typer.Option("--input-cost-per-1m", help="Input token cost in USD per 1M tokens."),
+    ] = None,
+    output_cost_per_1m: Annotated[
+        float | None,
+        typer.Option("--output-cost-per-1m", help="Output token cost in USD per 1M tokens."),
+    ] = None,
+    domain_pack_path: DomainPackOption = None,
+    limit: Annotated[int | None, typer.Option("--limit", min=1, help="Max items to analyze.")] = None,
+    db: DatabaseOption = Path("open_product_agent.sqlite3"),
+) -> None:
+    """Analyze imported items with an AI provider and store validated output."""
+    profile = _load_profile(profile_path)
+    domain_pack = load_domain_pack(profile.domain, domain_pack_path)
+    if domain_pack is None:
+        raise typer.BadParameter(f"No domain pack found for domain: {profile.domain}")
+
+    profile_id = profile_id_from_name(profile.name)
+    store = Store(db)
+    store.init()
+    store.save_profile(profile_id, profile)
+    provider = create_provider(provider_name, model=model, temperature=0)
+    items = store.list_items(domain=profile.domain)
+    if limit is not None:
+        items = items[:limit]
+
+    analyzed = 0
+    failed = 0
+    for item in items:
+        snapshot = store.get_latest_snapshot(item.id)
+        if snapshot is None:
+            continue
+
+        input_payload = {
+            "profile": profile.model_dump(mode="json"),
+            "domain_pack": domain_pack.model_dump(mode="json"),
+            "item_snapshot": snapshot.model_dump(mode="json"),
+        }
+        input_hash = _hash_payload(input_payload)
+        validation_status = "valid"
+        output: dict[str, object] | None = None
+        try:
+            raw_output = provider.analyze_item(
+                profile=input_payload["profile"],
+                item_snapshot=input_payload["item_snapshot"],
+                domain_pack=input_payload["domain_pack"],
+            )
+            output = parse_and_validate_item_analysis(raw_output).model_dump(mode="json")
+            analyzed += 1
+        except (AnalysisValidationError, RuntimeError, ValueError) as exc:
+            validation_status = "analysis_failed"
+            output = {"error": str(exc)}
+            failed += 1
+
+        token_usage = getattr(provider, "last_token_usage", {})
+        analysis_run = AIAnalysisRun(
+            id=f"analysis_{uuid4().hex}",
+            item_id=item.id,
+            snapshot_id=snapshot.id,
+            profile_id=profile_id,
+            domain_pack_id=f"{domain_pack.domain}@{domain_pack.version}",
+            provider=provider_name,
+            model=model,
+            prompt_version=PROMPT_VERSION,
+            input_hash=input_hash,
+            output=output,
+            validation_status=validation_status,
+            token_usage=token_usage,
+            estimated_cost=estimate_cost_usd(
+                token_usage,
+                input_cost_per_1m=input_cost_per_1m,
+                output_cost_per_1m=output_cost_per_1m,
+            ),
+            created_at=datetime.now(UTC),
+        )
+        store.save_analysis_run(analysis_run)
+
+    typer.echo(f"Analyzed {analyzed} item(s), {failed} failed")
 
 
 @app.command()
@@ -123,12 +221,21 @@ def report(
     store = Store(db)
     store.init()
     scores = store.list_scores(profile_id)
+    analyses_by_item = {
+        item_id: analysis.output or {}
+        for item_id, analysis in store.list_latest_valid_analyses(profile_id).items()
+    }
     scored_items = [
         (item, score)
         for score in scores
         if (item := store.get_item(score.item_id)) is not None
     ]
-    report_markdown = render_report(profile=profile, scored_items=scored_items, top=top)
+    report_markdown = render_report(
+        profile=profile,
+        scored_items=scored_items,
+        top=top,
+        analyses_by_item=analyses_by_item,
+    )
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(report_markdown, encoding="utf-8")
     typer.echo(f"Report written: {output}")
@@ -184,6 +291,11 @@ def _import_records(path: Path, *, profile_path: Path, db: Path, loader: object)
     typer.echo(
         f"Imported {len(records)} item(s): {items_created} created, {items_updated} updated"
     )
+
+
+def _hash_payload(payload: object) -> str:
+    encoded = json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
+    return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
 
 
 if __name__ == "__main__":

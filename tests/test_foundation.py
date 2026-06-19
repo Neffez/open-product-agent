@@ -155,3 +155,95 @@ def test_short_synonyms_do_not_match_inside_unrelated_words() -> None:
     )
 
     assert "adaptive_cruise_control" not in scores[0].explanation
+
+
+def test_analyze_score_and_report_with_ai_output(tmp_path: Path, monkeypatch) -> None:
+    class FakeProvider:
+        last_token_usage = {"input_tokens": 10, "output_tokens": 20}
+
+        def analyze_item(self, profile, item_snapshot, domain_pack):
+            return {
+                "detected_attributes": {
+                    "air_conditioning": True,
+                    "isofix": True,
+                    "adaptive_cruise_control": True,
+                },
+                "risk_flags": ["service_history_missing"],
+                "positive_signals": ["detailed_description"],
+                "missing_information": ["accident_free"],
+                "evidence": [
+                    {
+                        "attribute": "air_conditioning",
+                        "value": True,
+                        "source_text": "Air conditioning listed.",
+                        "confidence": 0.9,
+                    }
+                ],
+                "seller_questions": ["Is the car accident-free?"],
+                "short_explanation": "Good match, but history needs confirmation.",
+            }
+
+    def fake_create_provider(provider, *, model, temperature=0):
+        return FakeProvider()
+
+    monkeypatch.setattr("open_product_agent.cli.create_provider", fake_create_provider)
+
+    db_path = tmp_path / "opa.sqlite3"
+    report_path = tmp_path / "report.md"
+    profile_path = ROOT / "examples/profiles/family_car.yml"
+    import_path = ROOT / "examples/imports/cars.json"
+    runner = CliRunner()
+
+    assert runner.invoke(
+        app,
+        [
+            "import",
+            "json",
+            str(import_path),
+            "--profile",
+            str(profile_path),
+            "--db",
+            str(db_path),
+        ],
+    ).exit_code == 0
+
+    analyze_result = runner.invoke(
+        app,
+        [
+            "analyze",
+            "--profile",
+            str(profile_path),
+            "--db",
+            str(db_path),
+            "--provider",
+            "openai",
+            "--model",
+            "fake-model",
+        ],
+    )
+    assert analyze_result.exit_code == 0
+    assert "Analyzed 1 item(s), 0 failed" in analyze_result.stdout
+
+    score_result = runner.invoke(
+        app,
+        ["score", "--profile", str(profile_path), "--db", str(db_path)],
+    )
+    assert score_result.exit_code == 0
+
+    report_result = runner.invoke(
+        app,
+        [
+            "report",
+            "--profile",
+            str(profile_path),
+            "--db",
+            str(db_path),
+            "--output",
+            str(report_path),
+        ],
+    )
+    assert report_result.exit_code == 0
+    report = report_path.read_text(encoding="utf-8")
+    assert "### AI Analysis" in report
+    assert "Good match, but history needs confirmation." in report
+    assert "Is the car accident-free?" in report
