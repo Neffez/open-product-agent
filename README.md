@@ -66,7 +66,7 @@ opa profile validate examples/profiles/family_car.yml
 opa domain validate domains/cars/domain.yml
 opa init-db --db open_product_agent.sqlite3
 opa import csv examples/imports/cars.csv --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3
-opa import html examples/imports/car_listing.html --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3
+opa import html examples/imports/car_listing.html examples/imports/another_listing.html --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3
 opa analyze --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3 --provider openai --model gpt-4.1-mini
 opa score --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3
 opa feedback add car_001 favorite --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3 --reason "worth checking"
@@ -82,6 +82,29 @@ For local Ollama testing:
 ```bash
 ollama pull llama3.1
 opa analyze --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3 --provider ollama --model llama3.1 --limit 1
+```
+
+## Web UI
+
+The Streamlit UI supports multiple HTML/CSV/JSON import files, scoring, AI
+analysis, reports, and feedback.
+
+```bash
+python -m pip install -e ".[ui]"
+streamlit run src/open_product_agent/ui/streamlit_app.py
+```
+
+## Docker
+
+The app can run in one container. Ollama is expected to run outside the app
+container.
+
+```bash
+docker build -t open-product-agent .
+docker run --rm -p 8501:8501 \
+  -v opa-data:/data \
+  -e OLLAMA_BASE_URL=http://host.docker.internal:11434 \
+  open-product-agent
 ```
 
 Cost estimates are only calculated when explicit token prices are passed:

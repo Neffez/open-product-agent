@@ -35,6 +35,9 @@ dev = [
   "pytest>=8.2",
   "ruff>=0.5"
 ]
+ui = [
+  "streamlit>=1.37"
+]
 
 [project.scripts]
 opa = "open_product_agent.cli:app"

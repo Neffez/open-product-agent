@@ -222,7 +222,7 @@ def test_analyze_score_and_report_with_ai_output(tmp_path: Path, monkeypatch) ->
     def fake_create_provider(provider, *, model, temperature=0):
         return FakeProvider()
 
-    monkeypatch.setattr("open_product_agent.cli.create_provider", fake_create_provider)
+    monkeypatch.setattr("open_product_agent.workflows.create_provider", fake_create_provider)
 
     db_path = tmp_path / "opa.sqlite3"
     report_path = tmp_path / "report.md"
@@ -298,7 +298,7 @@ def test_analyze_stores_provider_failures_without_crashing(tmp_path: Path, monke
     def fake_create_provider(provider, *, model, temperature=0):
         return FailingProvider()
 
-    monkeypatch.setattr("open_product_agent.cli.create_provider", fake_create_provider)
+    monkeypatch.setattr("open_product_agent.workflows.create_provider", fake_create_provider)
 
     db_path = tmp_path / "opa.sqlite3"
     profile_path = ROOT / "examples/profiles/family_car.yml"
@@ -419,6 +419,32 @@ def test_html_import_flow(tmp_path: Path) -> None:
         ["score", "--profile", str(profile_path), "--db", str(db_path)],
     )
     assert score_result.exit_code == 0
+
+
+def test_multi_html_import_flow(tmp_path: Path) -> None:
+    db_path = tmp_path / "opa.sqlite3"
+    profile_path = ROOT / "examples/profiles/family_car.yml"
+    import_path = ROOT / "examples/imports/car_listing.html"
+    second_import_path = tmp_path / "second_listing.html"
+    second_import_path.write_text(import_path.read_text(encoding="utf-8"), encoding="utf-8")
+    runner = CliRunner()
+
+    import_result = runner.invoke(
+        app,
+        [
+            "import",
+            "html",
+            str(import_path),
+            str(second_import_path),
+            "--profile",
+            str(profile_path),
+            "--db",
+            str(db_path),
+        ],
+    )
+
+    assert import_result.exit_code == 0
+    assert "Imported 2 item(s)" in import_result.stdout
 
 
 def test_provider_factory_creates_ollama_provider() -> None:
