@@ -1,0 +1,66 @@
+domain: cars
+version: 0.1.0
+schema_version: 1
+display_name: Used Cars
+supported_languages:
+  - en
+  - de
+fields:
+  - name: brand
+  - name: model
+  - name: year
+    type: integer
+  - name: mileage_km
+    type: integer
+  - name: price
+    type: integer
+  - name: fuel
+  - name: transmission
+  - name: body_type
+  - name: accident_free
+    type: boolean
+  - name: service_history
+  - name: inspection_valid_until
+  - name: number_of_owners
+    type: integer
+  - name: location
+synonyms:
+  adaptive_cruise_control:
+    - ACC
+    - adaptive cruise control
+    - distance cruise control
+    - Abstandstempomat
+    - Distronic
+  tow_bar:
+    - tow bar
+    - trailer hitch
+    - AHK
+    - Anhaengerkupplung
+  service_history:
+    - service history
+    - full service history
+    - scheckheftgepflegt
+    - serviceheft gepflegt
+risk_flags:
+  - accident_unclear
+  - service_history_missing
+  - import_unclear
+  - suspicious_price
+  - high_mileage
+  - short_description
+  - known_problem_engine
+  - inconsistent_listing_data
+positive_signals:
+  - complete_service_history
+  - accident_free_confirmed
+  - recent_inspection
+  - detailed_equipment_list
+questions:
+  - Is the car accident-free?
+  - Is there a complete service history?
+  - Was the transmission serviced according to manufacturer requirements?
+  - Are there known defects or upcoming repairs?
+  - Is the listed equipment actually installed or only prepared?
+scoring_hints:
+  risk_penalty_per_flag: 5
+  missing_must_have_penalty: 15

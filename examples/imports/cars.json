@@ -1,0 +1,19 @@
+[
+  {
+    "id": "car_001",
+    "source_name": "example",
+    "source_url": "https://example.com/cars/1",
+    "title": "Skoda Superb Combi 2.0 TSI DSG",
+    "price": 23900,
+    "currency": "EUR",
+    "location": "Munich",
+    "seller_type": "dealer",
+    "attributes": {
+      "year": 2020,
+      "mileage_km": 72000,
+      "fuel": "petrol",
+      "transmission": "automatic"
+    },
+    "description": "Estate car with ACC, Isofix, LED headlights and full service history."
+  }
+]

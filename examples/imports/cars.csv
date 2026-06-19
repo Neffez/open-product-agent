@@ -1,0 +1,3 @@
+id,source_name,source_url,title,price,currency,location,seller_type,year,mileage_km,fuel,transmission,description
+car_001,example,https://example.com/cars/1,Skoda Superb Combi 2.0 TSI DSG,23900,EUR,Munich,dealer,2020,72000,petrol,automatic,"Estate car with ACC, Isofix, LED headlights and full service history."
+car_002,example,https://example.com/cars/2,VW Passat Variant 2.0 TDI,21400,EUR,Nuremberg,dealer,2019,98000,diesel,automatic,"Family estate. Service history available. Accident-free status not explicitly stated."

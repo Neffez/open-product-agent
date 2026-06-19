@@ -1,0 +1,30 @@
+profile:
+  name: Family car
+  domain: cars
+  budget:
+    max: 25000
+    currency: EUR
+  hard_constraints:
+    max_price: 25000
+    min_year: 2018
+    max_mileage_km: 120000
+  must_have:
+    - isofix
+    - air_conditioning
+  nice_to_have:
+    - adaptive_cruise_control
+    - tow_bar
+    - led_headlights
+    - rear_camera
+  avoid:
+    - import_without_history
+    - tuning
+    - incomplete_service_history
+    - accident_vehicle
+  usage_description: >
+    Family car for daily use, vacations, hardware store trips,
+    and occasional garden transport.
+  risk_tolerance: low
+  location:
+    country: DE
+    max_distance_km: 250
