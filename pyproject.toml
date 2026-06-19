@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Self-hosted product research and ranking assistant."
 readme = "README.md"
 requires-python = ">=3.11"
-license = "AGPLv3"
+license = "AGPL-3.0-only"
 authors = [
   { name = "Open Product Agent contributors" }
 ]
@@ -17,7 +17,7 @@ classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Environment :: Console",
   "Intended Audience :: End Users/Desktop",
-  "License :: OSI Approved :: AGPLv3 License",
+  "License :: OSI Approved :: GNU Affero General Public License v3",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
@@ -31,6 +31,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+crawler = [
+  "scrapy>=2.11"
+]
 dev = [
   "pytest>=8.2",
   "ruff>=0.5"

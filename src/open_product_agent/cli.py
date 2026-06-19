@@ -100,6 +100,16 @@ def import_html(
     _import_many(paths, profile_path=profile_path, db=db, import_type="html")
 
 
+@import_app.command("scrapy")
+def import_scrapy(
+    recipes: list[Path],
+    profile_path: Annotated[Path, typer.Option("--profile", help="YAML profile path.")],
+    db: DatabaseOption = Path("open_product_agent.sqlite3"),
+) -> None:
+    """Import products from explicit, user-controlled Scrapy recipes."""
+    _import_many(recipes, profile_path=profile_path, db=db, import_type="scrapy")
+
+
 @app.command()
 def score(
     profile_path: Annotated[Path, typer.Option("--profile", help="YAML profile path.")],

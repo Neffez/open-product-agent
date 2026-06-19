@@ -13,7 +13,7 @@ COPY domains ./domains
 COPY examples ./examples
 COPY docs ./docs
 
-RUN pip install --no-cache-dir -e ".[ui]"
+RUN pip install --no-cache-dir -e ".[ui,crawler]"
 
 EXPOSE 8501
 

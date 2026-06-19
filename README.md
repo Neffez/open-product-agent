@@ -19,7 +19,7 @@ installable project skeleton for the CLI MVP.
 - AI extracts, normalizes, and explains.
 - Deterministic rules score and enforce constraints.
 - User-defined imports only.
-- No web automation in the MVP.
+- Optional crawling only through explicit user recipes.
 - Store snapshots and analysis metadata for auditability.
 
 ## What It Is
@@ -67,6 +67,7 @@ opa domain validate domains/cars/domain.yml
 opa init-db --db open_product_agent.sqlite3
 opa import csv examples/imports/cars.csv --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3
 opa import html examples/imports/car_listing.html examples/imports/another_listing.html --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3
+opa import scrapy examples/imports/scrapy_recipe.example.yml --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3
 opa analyze --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3 --provider openai --model gpt-4.1-mini
 opa score --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3
 opa feedback add car_001 favorite --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3 --reason "worth checking"
@@ -76,6 +77,16 @@ opa report --profile examples/profiles/family_car.yml --db open_product_agent.sq
 The current CLI supports local CSV/JSON imports, deterministic scoring, and
 Markdown report generation. AI analysis is available through OpenAI and Ollama
 providers and stores validated structured output before scoring uses it.
+
+Scrapy support is optional and recipe-based:
+
+```bash
+python -m pip install -e ".[crawler]"
+opa import scrapy path/to/recipe.yml --profile examples/profiles/family_car.yml
+```
+
+Recipes must define start URLs, allowed domains, selectors, and conservative
+crawl settings. The project does not ship marketplace-specific scrapers.
 
 For local Ollama testing:
 
@@ -125,4 +136,3 @@ Open Product Agent is released under the **GNU Affero General Public License v3.
 If you want to host this application as a commercial service or a public SaaS (e.g., providing the Web UI to third parties over a network) without disclosing your own platform's source code, you **must** obtain a commercial license.
 
 Please contact the maintainer for commercial licensing options.
-

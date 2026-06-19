@@ -1,8 +1,7 @@
 # Importer Guide
 
-The MVP importers are limited to local CSV and JSON files. This keeps the first
-version focused on product understanding, scoring, and reporting rather than web
-automation.
+The default importers are local CSV, JSON, and HTML files. Crawling is optional
+and only available through explicit user-controlled recipes.
 
 ## CSV
 
@@ -40,3 +39,42 @@ opa import html examples/imports/car_listing.html examples/imports/another_listi
 
 Future importers may support user-defined feeds, saved local HTML files, browser
 bookmarklets, or explicit recipes. They must remain optional and user-controlled.
+
+## Scrapy Recipes
+
+Scrapy support is installed through the `crawler` extra:
+
+```bash
+python -m pip install -e ".[crawler]"
+opa import scrapy path/to/recipe.yml --profile examples/profiles/family_car.yml
+```
+
+Recipes define what to fetch and what to extract. They must include explicit
+`start_urls`, `allowed_domains`, field selectors, and conservative crawl
+settings:
+
+```yaml
+name: example_products
+start_urls:
+  - https://example.com/products
+allowed_domains:
+  - example.com
+item_selector: ".product"
+fields:
+  title: ".title::text"
+  price: ".price::text"
+  source_url: "a.details::attr(href)"
+  description: ".description::text"
+attributes:
+  mileage_km: ".mileage::text"
+follow_links:
+  - "a.next::attr(href)"
+settings:
+  obey_robots_txt: true
+  download_delay: 5
+  max_pages: 10
+  concurrent_requests: 1
+```
+
+The importer does not include target-specific marketplace recipes, browser
+automation, login handling, CAPTCHA handling, or proxy rotation.

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import yaml
+import pytest
 from typer.testing import CliRunner
 
 from open_product_agent import __version__
@@ -9,6 +10,7 @@ from open_product_agent.ai.providers import create_provider
 from open_product_agent.cli import app
 from open_product_agent.domain_packs.loader import load_domain_pack
 from open_product_agent.importers.json_importer import load_json
+from open_product_agent.importers.scrapy_importer import ScrapyRecipe, load_scrapy_recipe_config
 from open_product_agent.models.domain_pack import DomainPack
 from open_product_agent.models.profile import ProductProfileEnvelope
 from open_product_agent.scoring.basic import calculate_scores
@@ -445,6 +447,38 @@ def test_multi_html_import_flow(tmp_path: Path) -> None:
 
     assert import_result.exit_code == 0
     assert "Imported 2 item(s)" in import_result.stdout
+
+
+def test_scrapy_recipe_example_is_valid_and_conservative() -> None:
+    recipe = load_scrapy_recipe_config(ROOT / "examples/imports/scrapy_recipe.example.yml")
+
+    assert recipe.name == "example_products"
+    assert recipe.settings.obey_robots_txt is True
+    assert recipe.settings.download_delay >= 1
+    assert recipe.settings.concurrent_requests == 1
+    assert recipe.settings.max_pages == 10
+
+
+def test_scrapy_recipe_requires_explicit_allowed_domains_and_fields() -> None:
+    with pytest.raises(ValueError):
+        ScrapyRecipe.model_validate(
+            {
+                "name": "unsafe",
+                "start_urls": ["https://example.com/products"],
+                "allowed_domains": [],
+                "fields": {"title": ".title::text"},
+            }
+        )
+
+    with pytest.raises(ValueError):
+        ScrapyRecipe.model_validate(
+            {
+                "name": "missing_fields",
+                "start_urls": ["https://example.com/products"],
+                "allowed_domains": ["example.com"],
+                "fields": {},
+            }
+        )
 
 
 def test_provider_factory_creates_ollama_provider() -> None:

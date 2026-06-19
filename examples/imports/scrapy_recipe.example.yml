@@ -1,0 +1,22 @@
+name: example_products
+start_urls:
+  - https://example.com/products
+allowed_domains:
+  - example.com
+item_selector: ".product"
+fields:
+  title: ".title::text"
+  price: ".price::text"
+  currency: ".currency::text"
+  source_url: "a.details::attr(href)"
+  description: ".description::text"
+attributes:
+  mileage_km: ".mileage::text"
+  year: ".year::text"
+follow_links:
+  - "a.next::attr(href)"
+settings:
+  obey_robots_txt: true
+  download_delay: 5
+  max_pages: 10
+  concurrent_requests: 1

@@ -18,6 +18,7 @@ from open_product_agent.domain_packs.loader import load_domain_pack
 from open_product_agent.importers.csv_importer import load_csv
 from open_product_agent.importers.html_importer import load_html
 from open_product_agent.importers.json_importer import load_json
+from open_product_agent.importers.scrapy_importer import load_scrapy_recipe
 from open_product_agent.models.analysis import AIAnalysisRun
 from open_product_agent.models.feedback import FeedbackEvent, FeedbackType
 from open_product_agent.models.item import ImportRun, Item, ItemSnapshot
@@ -261,6 +262,8 @@ def _loader_for(import_type: str, domain: str, import_run_id: str) -> Loader:
         return lambda path: load_json(path, domain=domain, import_run_id=import_run_id)
     if import_type == "html":
         return lambda path: load_html(path, domain=domain, import_run_id=import_run_id)
+    if import_type == "scrapy":
+        return lambda path: load_scrapy_recipe(path, domain=domain, import_run_id=import_run_id)
     raise ValueError(f"Unsupported import type: {import_type}")
 
 
