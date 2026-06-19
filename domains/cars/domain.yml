@@ -1,5 +1,5 @@
 domain: cars
-version: 0.1.0
+version: 0.2.0
 schema_version: 1
 display_name: Used Cars
 supported_languages:
@@ -24,23 +24,58 @@ fields:
   - name: number_of_owners
     type: integer
   - name: location
+  - name: engine
+  - name: emission_class
 synonyms:
+  isofix:
+    - ISOFIX
+    - Isofix
+    - child seat anchor
+    - Kindersitzbefestigung
+  air_conditioning:
+    - air conditioning
+    - climate control
+    - AC
+    - Klima
+    - Klimaanlage
+    - Climatronic
   adaptive_cruise_control:
     - ACC
     - adaptive cruise control
     - distance cruise control
     - Abstandstempomat
     - Distronic
+    - Distanzregelung
   tow_bar:
     - tow bar
     - trailer hitch
     - AHK
     - Anhaengerkupplung
+    - Anhängerkupplung
+    - abnehmbare AHK
+  led_headlights:
+    - LED
+    - LED headlights
+    - LED-Scheinwerfer
+    - Matrix LED
+  rear_camera:
+    - rear camera
+    - reversing camera
+    - Rueckfahrkamera
+    - Rückfahrkamera
   service_history:
     - service history
     - full service history
     - scheckheftgepflegt
     - serviceheft gepflegt
+    - Scheckheft
+    - lueckenlos
+    - lückenlos
+  accident_free:
+    - accident-free
+    - unfallfrei
+    - no accident
+    - kein Unfall
 risk_flags:
   - accident_unclear
   - service_history_missing
@@ -50,6 +85,9 @@ risk_flags:
   - short_description
   - known_problem_engine
   - inconsistent_listing_data
+  - inspection_missing
+  - many_owners
+  - no_warranty
 positive_signals:
   - complete_service_history
   - accident_free_confirmed
@@ -61,6 +99,41 @@ questions:
   - Was the transmission serviced according to manufacturer requirements?
   - Are there known defects or upcoming repairs?
   - Is the listed equipment actually installed or only prepared?
+  - When is the next inspection due?
+  - How many previous owners are documented?
+  - Can you provide photos of the service booklet and inspection report?
 scoring_hints:
   risk_penalty_per_flag: 5
   missing_must_have_penalty: 15
+  missing_information_penalty: 3
+risk_rules:
+  - flag: high_mileage
+    attribute: mileage_km
+    operator: greater_than
+    value: 150000
+    penalty: 10
+  - flag: short_description
+    attribute: source_text
+    operator: text_shorter_than
+    value: 80
+    penalty: 8
+  - flag: accident_unclear
+    attribute: accident_free
+    operator: missing_or_unknown
+    penalty: 8
+  - flag: service_history_missing
+    attribute: service_history
+    operator: missing_or_unknown
+    source_synonyms:
+      - service history
+      - scheckheft
+      - scheckheftgepflegt
+    penalty: 8
+  - flag: inspection_missing
+    attribute: inspection_valid_until
+    operator: missing_or_unknown
+    source_synonyms:
+      - TÜV
+      - HU
+      - inspection
+    penalty: 5

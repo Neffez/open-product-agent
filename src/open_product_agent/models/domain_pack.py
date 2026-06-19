@@ -10,6 +10,15 @@ class DomainField(BaseModel):
     description: str | None = None
 
 
+class RiskRule(BaseModel):
+    flag: str
+    attribute: str | None = None
+    operator: str
+    value: Any | None = None
+    source_synonyms: list[str] = Field(default_factory=list)
+    penalty: int = Field(default=5, ge=0)
+
+
 class DomainPack(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -24,3 +33,4 @@ class DomainPack(BaseModel):
     positive_signals: list[str] = Field(default_factory=list)
     questions: list[str] = Field(default_factory=list)
     scoring_hints: dict[str, Any] = Field(default_factory=dict)
+    risk_rules: list[RiskRule] = Field(default_factory=list)

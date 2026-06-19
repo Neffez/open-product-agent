@@ -7,6 +7,7 @@ from pathlib import Path
 
 from open_product_agent.database.schema import SCHEMA_SQL
 from open_product_agent.models.analysis import AIAnalysisRun
+from open_product_agent.models.feedback import FeedbackEvent
 from open_product_agent.models.item import ImportRun, Item, ItemSnapshot
 from open_product_agent.models.profile import ProductProfile
 from open_product_agent.models.score import ItemScore
@@ -192,6 +193,39 @@ class Store:
                 ),
             )
 
+    def save_feedback_event(self, event: FeedbackEvent) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO feedback_events (
+                  id, item_id, profile_id, feedback_type, reason, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    event.id,
+                    event.item_id,
+                    event.profile_id,
+                    event.feedback_type,
+                    event.reason,
+                    event.created_at.isoformat(),
+                ),
+            )
+
+    def list_feedback_events(
+        self,
+        profile_id: str,
+        item_id: str | None = None,
+    ) -> list[FeedbackEvent]:
+        query = "SELECT * FROM feedback_events WHERE profile_id = ?"
+        parameters: tuple[str, ...] = (profile_id,)
+        if item_id is not None:
+            query += " AND item_id = ?"
+            parameters = (profile_id, item_id)
+        query += " ORDER BY created_at DESC"
+        with self._connect() as connection:
+            rows = connection.execute(query, parameters).fetchall()
+        return [self._row_to_feedback_event(row) for row in rows]
+
     def list_scores(self, profile_id: str) -> list[ItemScore]:
         with self._connect() as connection:
             rows = connection.execute(
@@ -313,5 +347,16 @@ class Store:
             validation_status=row["validation_status"],
             token_usage=json.loads(row["token_usage_json"] or "{}"),
             estimated_cost=row["estimated_cost"],
+            created_at=datetime.fromisoformat(row["created_at"]),
+        )
+
+    @staticmethod
+    def _row_to_feedback_event(row: sqlite3.Row) -> FeedbackEvent:
+        return FeedbackEvent(
+            id=row["id"],
+            item_id=row["item_id"],
+            profile_id=row["profile_id"],
+            feedback_type=row["feedback_type"],
+            reason=row["reason"],
             created_at=datetime.fromisoformat(row["created_at"]),
         )

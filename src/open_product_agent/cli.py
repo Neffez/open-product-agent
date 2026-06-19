@@ -17,9 +17,11 @@ from open_product_agent.ai.validator import parse_and_validate_item_analysis
 from open_product_agent.database.store import Store
 from open_product_agent.domain_packs.loader import load_domain_pack
 from open_product_agent.importers.csv_importer import load_csv
+from open_product_agent.importers.html_importer import load_html
 from open_product_agent.importers.json_importer import load_json
 from open_product_agent.models.analysis import AIAnalysisRun
 from open_product_agent.models.domain_pack import DomainPack
+from open_product_agent.models.feedback import FeedbackEvent, FeedbackType
 from open_product_agent.models.item import ImportRun
 from open_product_agent.models.profile import ProductProfile, ProductProfileEnvelope
 from open_product_agent.reports.markdown import render_report
@@ -29,10 +31,12 @@ app = typer.Typer(help="Open Product Agent CLI.")
 profile_app = typer.Typer(help="Validate and manage product profiles.")
 domain_app = typer.Typer(help="Validate and inspect domain packs.")
 import_app = typer.Typer(help="Import local product data.")
+feedback_app = typer.Typer(help="Record and inspect preference feedback.")
 
 app.add_typer(profile_app, name="profile")
 app.add_typer(domain_app, name="domain")
 app.add_typer(import_app, name="import")
+app.add_typer(feedback_app, name="feedback")
 
 DatabaseOption = Annotated[
     Path,
@@ -93,6 +97,16 @@ def import_json(
     _import_records(path, profile_path=profile_path, db=db, loader=load_json)
 
 
+@import_app.command("html")
+def import_html(
+    path: Path,
+    profile_path: Annotated[Path, typer.Option("--profile", help="YAML profile path.")],
+    db: DatabaseOption = Path("open_product_agent.sqlite3"),
+) -> None:
+    """Import one local HTML file as user-provided offline product data."""
+    _import_records(path, profile_path=profile_path, db=db, loader=load_html)
+
+
 @app.command()
 def score(
     profile_path: Annotated[Path, typer.Option("--profile", help="YAML profile path.")],
@@ -111,12 +125,14 @@ def score(
         item_id: analysis.output or {}
         for item_id, analysis in store.list_latest_valid_analyses(profile_id).items()
     }
+    feedback_by_item = _group_feedback(store.list_feedback_events(profile_id))
     scores = calculate_scores(
         profile,
         items,
         profile_id=profile_id,
         domain_pack=domain_pack,
         analyses_by_item=analyses_by_item,
+        feedback_by_item=feedback_by_item,
     )
     store.save_scores(scores)
     typer.echo(f"Scored {len(scores)} item(s) for profile: {profile.name}")
@@ -208,6 +224,53 @@ def analyze(
     typer.echo(f"Analyzed {analyzed} item(s), {failed} failed")
 
 
+@feedback_app.command("add")
+def add_feedback(
+    item_id: str,
+    feedback_type: FeedbackType,
+    profile_path: Annotated[Path, typer.Option("--profile", help="YAML profile path.")],
+    reason: Annotated[str | None, typer.Option("--reason", help="Optional feedback reason.")] = None,
+    db: DatabaseOption = Path("open_product_agent.sqlite3"),
+) -> None:
+    """Record explicit preference feedback for an item."""
+    profile = _load_profile(profile_path)
+    profile_id = profile_id_from_name(profile.name)
+    store = Store(db)
+    store.init()
+    store.save_profile(profile_id, profile)
+    if store.get_item(item_id) is None:
+        raise typer.BadParameter(f"Unknown item id: {item_id}")
+    event = FeedbackEvent(
+        id=f"feedback_{uuid4().hex}",
+        item_id=item_id,
+        profile_id=profile_id,
+        feedback_type=feedback_type,
+        reason=reason,
+        created_at=datetime.now(UTC),
+    )
+    store.save_feedback_event(event)
+    typer.echo(f"Feedback recorded: {item_id} -> {feedback_type}")
+
+
+@feedback_app.command("list")
+def list_feedback(
+    profile_path: Annotated[Path, typer.Option("--profile", help="YAML profile path.")],
+    item_id: Annotated[str | None, typer.Option("--item", help="Optional item id.")] = None,
+    db: DatabaseOption = Path("open_product_agent.sqlite3"),
+) -> None:
+    """List stored feedback events for a profile."""
+    profile = _load_profile(profile_path)
+    profile_id = profile_id_from_name(profile.name)
+    store = Store(db)
+    store.init()
+    events = store.list_feedback_events(profile_id, item_id=item_id)
+    for event in events:
+        suffix = f" - {event.reason}" if event.reason else ""
+        typer.echo(f"{event.created_at.isoformat()} {event.item_id} {event.feedback_type}{suffix}")
+    if not events:
+        typer.echo("No feedback events found.")
+
+
 @app.command()
 def report(
     profile_path: Annotated[Path, typer.Option("--profile", help="YAML profile path.")],
@@ -296,6 +359,13 @@ def _import_records(path: Path, *, profile_path: Path, db: Path, loader: object)
 def _hash_payload(payload: object) -> str:
     encoded = json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
     return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
+
+
+def _group_feedback(events: list[FeedbackEvent]) -> dict[str, list[FeedbackEvent]]:
+    grouped: dict[str, list[FeedbackEvent]] = {}
+    for event in events:
+        grouped.setdefault(event.item_id, []).append(event)
+    return grouped
 
 
 if __name__ == "__main__":

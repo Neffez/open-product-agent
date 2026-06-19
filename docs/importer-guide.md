@@ -27,5 +27,16 @@ JSON imports accept either a single object, a list of objects, or an object with
 an `items` list. The optional `attributes` object is preserved and additional
 top-level fields are merged into attributes.
 
+## Local HTML
+
+HTML imports are offline-only. The importer reads a local file, strips scripts
+and styles, extracts readable text, and stores the source as a normal item
+snapshot. It does not fetch URLs or automate browsers.
+
+```bash
+opa import html examples/imports/car_listing.html \
+  --profile examples/profiles/family_car.yml
+```
+
 Future importers may support user-defined feeds, saved local HTML files, browser
 bookmarklets, or explicit recipes. They must remain optional and user-controlled.

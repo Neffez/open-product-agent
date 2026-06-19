@@ -1,14 +1,14 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field
 
 
 class Item(BaseModel):
     id: str
     domain: str
     source_name: str | None = None
-    source_url: HttpUrl | None = None
+    source_url: str | None = None
     title: str | None = None
     price: int | None = Field(default=None, ge=0)
     currency: str | None = None

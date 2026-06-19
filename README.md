@@ -66,8 +66,10 @@ opa profile validate examples/profiles/family_car.yml
 opa domain validate domains/cars/domain.yml
 opa init-db --db open_product_agent.sqlite3
 opa import csv examples/imports/cars.csv --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3
+opa import html examples/imports/car_listing.html --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3
 opa analyze --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3 --provider openai --model gpt-4.1-mini
 opa score --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3
+opa feedback add car_001 favorite --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3 --reason "worth checking"
 opa report --profile examples/profiles/family_car.yml --db open_product_agent.sqlite3 --output examples/reports/family_car.md
 ```
 

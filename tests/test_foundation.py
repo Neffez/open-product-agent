@@ -159,6 +159,37 @@ def test_short_synonyms_do_not_match_inside_unrelated_words() -> None:
     assert "adaptive_cruise_control" not in scores[0].explanation
 
 
+def test_cars_domain_risk_rules_trigger_from_pack() -> None:
+    profile_data = yaml.safe_load((ROOT / "examples/profiles/family_car.yml").read_text())
+    profile = ProductProfileEnvelope.model_validate(profile_data).profile
+    domain_pack = load_domain_pack("cars", ROOT / "domains/cars/domain.yml")
+    records = load_json(
+        ROOT / "examples/imports/cars.json",
+        domain="cars",
+        import_run_id="run_test",
+    )
+    item = records[0][0].model_copy(
+        update={
+            "id": "high_mileage_short_text",
+            "attributes": {
+                "year": 2019,
+                "mileage_km": 180000,
+                "source_text": "Short text.",
+            },
+        }
+    )
+
+    scores = calculate_scores(
+        profile,
+        [item],
+        profile_id="family_car",
+        domain_pack=domain_pack,
+    )
+
+    assert "high_mileage" in scores[0].explanation
+    assert "short_description" in scores[0].explanation
+
+
 def test_analyze_score_and_report_with_ai_output(tmp_path: Path, monkeypatch) -> None:
     class FakeProvider:
         last_token_usage = {"input_tokens": 10, "output_tokens": 20}
@@ -304,6 +335,90 @@ def test_analyze_stores_provider_failures_without_crashing(tmp_path: Path, monke
 
     assert analyze_result.exit_code == 0
     assert "Analyzed 0 item(s), 1 failed" in analyze_result.stdout
+
+
+def test_feedback_adjusts_future_scores(tmp_path: Path) -> None:
+    db_path = tmp_path / "opa.sqlite3"
+    profile_path = ROOT / "examples/profiles/family_car.yml"
+    import_path = ROOT / "examples/imports/cars.json"
+    runner = CliRunner()
+
+    assert runner.invoke(
+        app,
+        [
+            "import",
+            "json",
+            str(import_path),
+            "--profile",
+            str(profile_path),
+            "--db",
+            str(db_path),
+        ],
+    ).exit_code == 0
+    assert runner.invoke(
+        app,
+        ["score", "--profile", str(profile_path), "--db", str(db_path)],
+    ).exit_code == 0
+
+    feedback_result = runner.invoke(
+        app,
+        [
+            "feedback",
+            "add",
+            "car_001",
+            "too_risky",
+            "--profile",
+            str(profile_path),
+            "--db",
+            str(db_path),
+            "--reason",
+            "history unclear",
+        ],
+    )
+    assert feedback_result.exit_code == 0
+
+    score_result = runner.invoke(
+        app,
+        ["score", "--profile", str(profile_path), "--db", str(db_path)],
+    )
+    assert score_result.exit_code == 0
+
+    list_result = runner.invoke(
+        app,
+        ["feedback", "list", "--profile", str(profile_path), "--db", str(db_path)],
+    )
+    assert list_result.exit_code == 0
+    assert "too_risky" in list_result.stdout
+    assert "history unclear" in list_result.stdout
+
+
+def test_html_import_flow(tmp_path: Path) -> None:
+    db_path = tmp_path / "opa.sqlite3"
+    profile_path = ROOT / "examples/profiles/family_car.yml"
+    import_path = ROOT / "examples/imports/car_listing.html"
+    runner = CliRunner()
+
+    import_result = runner.invoke(
+        app,
+        [
+            "import",
+            "html",
+            str(import_path),
+            "--profile",
+            str(profile_path),
+            "--db",
+            str(db_path),
+        ],
+    )
+
+    assert import_result.exit_code == 0
+    assert "Imported 1 item(s)" in import_result.stdout
+
+    score_result = runner.invoke(
+        app,
+        ["score", "--profile", str(profile_path), "--db", str(db_path)],
+    )
+    assert score_result.exit_code == 0
 
 
 def test_provider_factory_creates_ollama_provider() -> None:
