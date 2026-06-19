@@ -119,4 +119,10 @@ opa analyze \
 
 ## License
 
-Open Product Agent is released under the MIT License.
+Open Product Agent is released under the **GNU Affero General Public License v3.0 (AGPLv3)**.
+
+### Commercial Use & SaaS Hosting
+If you want to host this application as a commercial service or a public SaaS (e.g., providing the Web UI to third parties over a network) without disclosing your own platform's source code, you **must** obtain a commercial license.
+
+Please contact the maintainer for commercial licensing options.
+
